@@ -24,12 +24,67 @@
           "type": "object",
           "default": {},
           "description": "Current selected model mode"
+        },
+        "kilo-code.vsCodeLmModelSelector.qwen-coder-32b": {
+          "type": "object",
+          "default": {},
+          "description": "Qwen3 Coder 32B configuration"
+        },
+        "kilo-code.vsCodeLmModelSelector.qwen-coder-8b": {
+          "type": "object",
+          "default": {},
+          "description": "Qwen3 Coder 8B configuration"
+        },
+        "kilo-code.vsCodeLmModelSelector.glm-air": {
+          "type": "object",
+          "default": {},
+          "description": "GLM 4.5 Air configuration"
+        },
+        "kilo-code.vsCodeLmModelSelector.glm-flash": {
+          "type": "object",
+          "default": {},
+          "description": "GLM 4 Flash configuration"
+        },
+        "kilo-code.vsCodeLmModelSelector.deepseek-r1": {
+          "type": "object",
+          "default": {},
+          "description": "DeepSeek R1 configuration"
+        },
+        "kilo-code.vsCodeLmModelSelector.deepseek-v3": {
+          "type": "object",
+          "default": {},
+          "description": "DeepSeek V3 configuration"
+        },
+        "kilo-code.vsCodeLmModelSelector.kimi-k2": {
+          "type": "object",
+          "default": {},
+          "description": "Kimi K2 configuration"
+        },
+        "kilo-code.vsCodeLmModelSelector.kimi-k1.5": {
+          "type": "object",
+          "default": {},
+          "description": "Kimi K1.5 configuration"
+        },
+        "kilo-code.vsCodeLmModelSelector.mistral-nemo": {
+          "type": "object",
+          "default": {},
+          "description": "Mistral Nemo configuration"
+        },
+        "kilo-code.vsCodeLmModelSelector.codellama-70b": {
+          "type": "object",
+          "default": {},
+          "description": "CodeLlama 70B configuration"
+        },
+        "kilo-code.vsCodeLmModelSelector.starcoder2-15b": {
+          "type": "object",
+          "default": {},
+          "description": "StarCoder2 15B configuration"
         }
       }
     }
   },
   "activationEvents": [
-    "onCommand:kilo-code-model-selector.selectModel"
+    "*"
   ],
   "main": "./extension.js"
 }
