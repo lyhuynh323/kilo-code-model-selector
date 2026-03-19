@@ -1,0 +1,35 @@
+{
+  "name": "kilo-code-model-selector",
+  "displayName": "Kilo Code Model Selector",
+  "description": "Extension để chọn model cho Kilo Code",
+  "version": "1.0.0",
+  "publisher": "custom",
+  "engines": {
+    "vscode": "^1.70.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "kilo-code-model-selector.selectModel",
+        "title": "Kilo Code: Select Model"
+      }
+    ],
+    "configuration": {
+      "title": "Kilo Code Model Selector",
+      "properties": {
+        "kilo-code.vsCodeLmModelSelector.current_mode": {
+          "type": "object",
+          "default": {},
+          "description": "Current selected model mode"
+        }
+      }
+    }
+  },
+  "activationEvents": [
+    "onCommand:kilo-code-model-selector.selectModel"
+  ],
+  "main": "./extension.js"
+}
