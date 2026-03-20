@@ -3,6 +3,7 @@
   "displayName": "Kilo Code Model Selector",
   "description": "Extension để chọn model cho Kilo Code",
   "version": "1.0.0",
+  "repository": "https://github.com/example/kilo-code-model-selector",
   "publisher": "custom",
   "engines": {
     "vscode": "^1.70.0"
@@ -15,6 +16,10 @@
       {
         "command": "kilo-code-model-selector.selectModel",
         "title": "Kilo Code: Select Model"
+      },
+      {
+        "command": "kilo-code-model-selector.showCurrentModel",
+        "title": "Kilo Code: Show Current Model"
       }
     ],
     "configuration": {

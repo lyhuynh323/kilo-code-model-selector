@@ -61,6 +61,38 @@ const MODELS = {
 function activate(context) {
   console.log('Kilo Code Model Selector activated');
 
+  // Command hiển thị model hiện tại
+  const showCurrentModel = vscode.commands.registerCommand(
+    'kilo-code-model-selector.showCurrentModel',
+    async () => {
+      try {
+        const config = vscode.workspace.getConfiguration();
+        const currentConfig = config.get('kilo-code.vsCodeLmModelSelector') || {};
+        const currentMode = currentConfig.current_mode;
+
+        if (currentMode && currentMode.model) {
+          const modelInfo = MODELS[currentMode.model];
+          const modelLabel = modelInfo?.label || currentMode.model;
+          const modelName = modelInfo?.model || currentMode.model;
+          
+          vscode.window.showInformationMessage(
+            `Model hiện tại: ${modelLabel}`,
+            { modal: true, detail: `Model: ${modelName}\nAPI URL: ${currentMode.apiBaseUrl || 'https://openrouter.ai/api/v1'}` }
+          );
+        } else {
+          vscode.window.showInformationMessage(
+            'Chưa có model nào được chọn. Sử dụng lệnh "Chọn Model" để chọn model.'
+          );
+        }
+      } catch (error) {
+        console.error('Error in showCurrentModel:', error);
+        vscode.window.showErrorMessage(`Lỗi: ${error.message}`);
+      }
+    }
+  );
+
+  context.subscriptions.push(showCurrentModel);
+
   const disposable = vscode.commands.registerCommand(
     'kilo-code-model-selector.selectModel',
     async () => {

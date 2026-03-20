@@ -1,0 +1,9 @@
+{
+    "kilo-code.vsCodeLmModelSelector": {
+      "current_mode": {
+        "model": "glm-air",
+        "apiKey": "",
+        "apiBaseUrl": "https://openrouter.ai/api/v1"
+      }
+    }
+}
