@@ -204,11 +204,15 @@ function getBaseModelName(modelId) {
   return baseName.toLowerCase();
 }
 
+function getModelIdPrefix(modelId) {
+  const parts = modelId.split(':');
+  return parts[0];
+}
+
 function fetchFreeModelsFromOpenRouter(apiModels) {
   const models = apiModels || [];
   const freeModels = models.filter(isFreeModel);
   
-  // Remove duplicates: keep only one model per id, preferring the one with higher popularity (newer description)
   const uniqueModelsMap = {};
   for (const model of freeModels) {
     const popularity = model.credits || 0;
@@ -218,25 +222,24 @@ function fetchFreeModelsFromOpenRouter(apiModels) {
   }
   const uniqueFreeModels = Object.values(uniqueModelsMap).map(item => item.model);
   
-  // Group by baseName and select the most popular model for each baseName
   const baseModelGroups = {};
   
   for (const model of uniqueFreeModels) {
     const baseName = getBaseModelName(model.id);
+    const idPrefix = getModelIdPrefix(model.id);
+    const groupKey = `${baseName}|${idPrefix}`;
     const popularity = model.credits || 0;
     
-    if (!baseModelGroups[baseName]) {
-      baseModelGroups[baseName] = [];
+    if (!baseModelGroups[groupKey]) {
+      baseModelGroups[groupKey] = [];
     }
     
-    baseModelGroups[baseName].push({ model, popularity });
+    baseModelGroups[groupKey].push({ model, popularity });
   }
   
-  // For each baseName, select the model with highest popularity (tie-break by model.id for determinism)
   const selectedModels = [];
   
-  for (const [baseName, modelsWithPopularity] of Object.entries(baseModelGroups)) {
-    // Sort by popularity descending, then by model.id ascending for determinism
+  for (const [groupKey, modelsWithPopularity] of Object.entries(baseModelGroups)) {
     const sorted = [...modelsWithPopularity].sort((a, b) => {
       if (b.popularity !== a.popularity) {
         return b.popularity - a.popularity;
@@ -244,36 +247,32 @@ function fetchFreeModelsFromOpenRouter(apiModels) {
       return a.model.id.localeCompare(b.model.id);
     });
     
-    selectedModels.push(sorted[0].model); // Take the first (highest popularity)
+    selectedModels.push(sorted[0].model);
   }
   
-  // Sort selected models deterministically by model.id for consistent key assignment
   selectedModels.sort((a, b) => a.id.localeCompare(b.id));
   
-  // Assign keys deterministically, avoiding collisions with MODELS and previously assigned keys in this batch
   const result = {};
-  const reservedKeys = new Set(Object.keys(MODELS)); // Keys reserved by static models
-  const assignedKeys = new Set(); // Keys assigned in this batch
+  const reservedKeys = new Set(Object.keys(MODELS));
+  const assignedKeys = new Set();
   
   for (const model of selectedModels) {
     const baseKey = generateModelKey(model.id);
     let key = baseKey;
     let counter = 0;
     
-    // Keep trying until we find a key that's not reserved and not already assigned in this batch
     while (reservedKeys.has(key) || assignedKeys.has(key)) {
       counter++;
       key = `${baseKey}_${counter}`;
     }
     
-    // Assign this key to the model
     assignedKeys.add(key);
     result[key] = {
       label: `${model.name || model.id} (Free)`,
       model: model.id,
       description: model.description ? model.description.substring(0, 100) : 'Free model from OpenRouter',
       baseModelName: getBaseModelName(model.id),
-      variantsCount: 1 // Each key represents one selected model variant
+      variantsCount: 1
     };
   }
   
@@ -342,9 +341,15 @@ function activate(context) {
           };
           const canRestore = apiModels.some(m => m.id === depModel.model && isAvailable(m));
           if (canRestore) {
+            const mappedModel = findModelMapping(depModel.model, apiModels);
+            const isFree = mappedModel ? isFreeModel(mappedModel) : false;
+            const newModelId = mappedModel ? mappedModel.id : depModel.model;
+            
             MODELS[depKey] = {
               ...depModel,
+              model: newModelId,
               deprecated: false,
+              isFree: isFree,
               label: depModel.label.replace('[Deprecated] ', '')
             };
             delete DEPRECATED_MODELS[depKey];
@@ -383,7 +388,7 @@ function activate(context) {
         
         for (const [key, value] of Object.entries(freeModelsFromApi)) {
           if (key in DYNAMIC_MODELS) {
-            if (DYNAMIC_MODELS[key].description !== value.description) {
+            if (DYNAMIC_MODELS[key].description !== value.description || DYNAMIC_MODELS[key].model !== value.model) {
               DYNAMIC_MODELS[key] = { ...DYNAMIC_MODELS[key], ...value };
               updatedCount++;
             }
@@ -434,16 +439,26 @@ function activate(context) {
           const config = vscode.workspace.getConfiguration();
           const modelValue = allModels[selected.key]?.model || selected.detail;
           
-          // Lấy apiKey hiện tại từ model đã được cấu hình trước đó
-          const existingModelConfig = config.get(`kilo-code.vsCodeLmModelSelector.${selected.key}`);
-          const apiKey = existingModelConfig?.apiKey || '';
+          const allSettings = config.get('kilo-code.vsCodeLmModelSelector') || {};
+          const existingModelConfig = allSettings[selected.key];
+          let apiKey = existingModelConfig?.apiKey || '';
+          
+          if (!apiKey) {
+            for (const [key, setting] of Object.entries(allSettings)) {
+              if (key !== 'current_mode' && setting?.apiKey) {
+                apiKey = setting.apiKey;
+                break;
+              }
+            }
+          }
           
            // Cập nhật trực tiếp current_mode trong kilo-code.vsCodeLmModelSelector
-           await config.update('kilo-code.vsCodeLmModelSelector.current_mode', {
-             model: selected.key,
-             apiKey: apiKey,
-             apiBaseUrl: getOpenRouterApiUrl()
-           }, vscode.ConfigurationTarget.Global);
+            await config.update('kilo-code.vsCodeLmModelSelector.current_mode', {
+              model: selected.key,
+              modelId: modelValue,
+              apiKey: apiKey,
+              apiBaseUrl: getOpenRouterApiUrl()
+            }, vscode.ConfigurationTarget.Global);
 
           vscode.window.showInformationMessage(
             `Đã chọn model: ${selected.label}`

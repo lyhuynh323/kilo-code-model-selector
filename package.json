@@ -7,7 +7,8 @@
   "publisher": "custom",
   "scripts": {
     "test": "jest --coverage",
-    "test:watch": "jest --watch"
+    "test:watch": "jest --watch",
+    "build": "vsce package"
   },
   "devDependencies": {
     "jest": "^29.7.0"
