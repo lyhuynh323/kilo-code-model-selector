@@ -146,10 +146,18 @@ function generateModelKey(id) {
 async function fetchAllModelsFromOpenRouter() {
   const apiUrl = getOpenRouterApiUrl();
   const data = await httpGet(`${apiUrl}/models?limit=300`);
-  return data.data || [];
+  if (!data || !data.data || !Array.isArray(data.data)) {
+    console.warn('Invalid API response structure');
+    return [];
+  }
+  return data.data;
 }
 
 function findModelMapping(oldModelId, apiModels) {
+  if (!apiModels || !Array.isArray(apiModels)) {
+    return null;
+  }
+  
   const modelPatterns = {
     'qwen': ['qwen', 'qwen3', 'coder'],
     'glm': ['glm', 'z-ai'],
@@ -189,41 +197,86 @@ function findModelMapping(oldModelId, apiModels) {
   return null;
 }
 
+function getBaseModelName(modelId) {
+  const parts = modelId.split('/');
+  const namePart = parts[parts.length - 1];
+  const baseName = namePart.replace(/:.*$/, '').replace(/-.*$/, '');
+  return baseName.toLowerCase();
+}
+
 function fetchFreeModelsFromOpenRouter(apiModels) {
   const models = apiModels || [];
   const freeModels = models.filter(isFreeModel);
   
-  const seen = new Map();
-  const uniqueFreeModels = freeModels.filter(model => {
-    if (seen.has(model.id)) return false;
-    seen.set(model.id, model);
-    return true;
-  });
+  // Remove duplicates: keep only one model per id, preferring the one with higher popularity (newer description)
+  const uniqueModelsMap = {};
+  for (const model of freeModels) {
+    const popularity = model.credits || 0;
+    if (!uniqueModelsMap[model.id] || popularity > (uniqueModelsMap[model.id].popularity || 0)) {
+      uniqueModelsMap[model.id] = { model, popularity };
+    }
+  }
+  const uniqueFreeModels = Object.values(uniqueModelsMap).map(item => item.model);
   
-  const result = {};
-  const existingKeys = new Set([
-    ...Object.keys(MODELS),
-    ...Object.keys(DYNAMIC_MODELS),
-    ...Object.keys(DEPRECATED_MODELS)
-  ]);
+  // Group by baseName and select the most popular model for each baseName
+  const baseModelGroups = {};
   
   for (const model of uniqueFreeModels) {
-    const baseKey = generateModelKey(model.id);
-    let key = baseKey;
-    let counter = 1;
+    const baseName = getBaseModelName(model.id);
+    const popularity = model.credits || 0;
     
-    while (key in result || existingKeys.has(key)) {
-      key = `${baseKey}_${counter}`;
-      counter++;
+    if (!baseModelGroups[baseName]) {
+      baseModelGroups[baseName] = [];
     }
     
-    existingKeys.add(key);
+    baseModelGroups[baseName].push({ model, popularity });
+  }
+  
+  // For each baseName, select the model with highest popularity (tie-break by model.id for determinism)
+  const selectedModels = [];
+  
+  for (const [baseName, modelsWithPopularity] of Object.entries(baseModelGroups)) {
+    // Sort by popularity descending, then by model.id ascending for determinism
+    const sorted = [...modelsWithPopularity].sort((a, b) => {
+      if (b.popularity !== a.popularity) {
+        return b.popularity - a.popularity;
+      }
+      return a.model.id.localeCompare(b.model.id);
+    });
+    
+    selectedModels.push(sorted[0].model); // Take the first (highest popularity)
+  }
+  
+  // Sort selected models deterministically by model.id for consistent key assignment
+  selectedModels.sort((a, b) => a.id.localeCompare(b.id));
+  
+  // Assign keys deterministically, avoiding collisions with MODELS and previously assigned keys in this batch
+  const result = {};
+  const reservedKeys = new Set(Object.keys(MODELS)); // Keys reserved by static models
+  const assignedKeys = new Set(); // Keys assigned in this batch
+  
+  for (const model of selectedModels) {
+    const baseKey = generateModelKey(model.id);
+    let key = baseKey;
+    let counter = 0;
+    
+    // Keep trying until we find a key that's not reserved and not already assigned in this batch
+    while (reservedKeys.has(key) || assignedKeys.has(key)) {
+      counter++;
+      key = `${baseKey}_${counter}`;
+    }
+    
+    // Assign this key to the model
+    assignedKeys.add(key);
     result[key] = {
       label: `${model.name || model.id} (Free)`,
       model: model.id,
-      description: model.description ? model.description.substring(0, 100) : 'Free model from OpenRouter'
+      description: model.description ? model.description.substring(0, 100) : 'Free model from OpenRouter',
+      baseModelName: getBaseModelName(model.id),
+      variantsCount: 1 // Each key represents one selected model variant
     };
   }
+  
   return result;
 }
 
@@ -385,18 +438,12 @@ function activate(context) {
           const existingModelConfig = config.get(`kilo-code.vsCodeLmModelSelector.${selected.key}`);
           const apiKey = existingModelConfig?.apiKey || '';
           
-          // Lấy toàn bộ config hiện tại của kilo-code.vsCodeLmModelSelector
-          const currentSelectorConfig = config.get('kilo-code.vsCodeLmModelSelector') || {};
-          
-          // Cập nhật current_mode bên trong object thay vì tạo key mới ở root
-          currentSelectorConfig.current_mode = {
-            model: selected.key,
-            apiKey: apiKey,
-            apiBaseUrl: getOpenRouterApiUrl()
-          };
-          
-          // Ghi lại toàn bộ object kilo-code.vsCodeLmModelSelector
-          await config.update('kilo-code.vsCodeLmModelSelector', currentSelectorConfig, vscode.ConfigurationTarget.Global);
+           // Cập nhật trực tiếp current_mode trong kilo-code.vsCodeLmModelSelector
+           await config.update('kilo-code.vsCodeLmModelSelector.current_mode', {
+             model: selected.key,
+             apiKey: apiKey,
+             apiBaseUrl: getOpenRouterApiUrl()
+           }, vscode.ConfigurationTarget.Global);
 
           vscode.window.showInformationMessage(
             `Đã chọn model: ${selected.label}`

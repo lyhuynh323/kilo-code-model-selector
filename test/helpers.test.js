@@ -5,10 +5,18 @@ describe('Kilo Code Model Selector - Helper Functions', () => {
   let generateModelKey;
   let findModelMapping;
   let fetchFreeModelsFromOpenRouter;
+  let getBaseModelName;
 
   beforeEach(() => {
     jest.resetModules();
     
+    getBaseModelName = function(modelId) {
+      const parts = modelId.split('/');
+      const namePart = parts[parts.length - 1];
+      const baseName = namePart.replace(/:.*$/, '').replace(/-.*$/, '');
+      return baseName.toLowerCase();
+    };
+
     MODELS = {
       'qwen-coder-32b': {
         label: 'Qwen3 Coder 32B (Free)',
@@ -69,22 +77,50 @@ describe('Kilo Code Model Selector - Helper Functions', () => {
       const models = apiModels || [];
       const freeModels = models.filter(isFreeModel);
       
-      const seen = new Map();
+      const seenById = new Map();
       const uniqueFreeModels = freeModels.filter(model => {
-        if (seen.has(model.id)) return false;
-        seen.set(model.id, model);
+        if (seenById.has(model.id)) return false;
+        seenById.set(model.id, model);
         return true;
       });
       
+      const baseModelPriority = {};
       const result = {};
-      const existingKeys = new Set(Object.keys(MODELS));
+      const existingKeys = new Set([
+        ...Object.keys(MODELS),
+        ...Object.keys(DYNAMIC_MODELS)
+      ]);
       
       for (const model of uniqueFreeModels) {
+        const baseName = getBaseModelName(model.id);
+        
+        if (!baseModelPriority[baseName]) {
+          baseModelPriority[baseName] = {
+            count: 0,
+            model: model,
+            popularity: model.credits || 0
+          };
+        }
+        
+        const currentPopularity = model.credits || 0;
+        if (currentPopularity > baseModelPriority[baseName].popularity) {
+          baseModelPriority[baseName] = {
+            count: baseModelPriority[baseName].count + 1,
+            model: model,
+            popularity: currentPopularity
+          };
+        } else {
+          baseModelPriority[baseName].count++;
+        }
+      }
+      
+      for (const [baseName, info] of Object.entries(baseModelPriority)) {
+        const model = info.model;
         const baseKey = generateModelKey(model.id);
         let key = baseKey;
         let counter = 1;
         
-        while (existingKeys.has(key) || key in DYNAMIC_MODELS) {
+        while (key in result || existingKeys.has(key)) {
           key = `${baseKey}_${counter}`;
           counter++;
         }
@@ -114,6 +150,24 @@ describe('Kilo Code Model Selector - Helper Functions', () => {
 
     test('should convert to lowercase', () => {
       expect(generateModelKey('QWEN/QWEN3-CODER')).toBe('qwen_qwen3_coder');
+    });
+  });
+
+  describe('getBaseModelName', () => {
+    test('should extract base name from model id', () => {
+      expect(getBaseModelName('qwen/qwen3-coder:free')).toBe('qwen3');
+      expect(getBaseModelName('qwen/qwen3-coder-32b')).toBe('qwen3');
+      expect(getBaseModelName('qwen/qwen3-coder-32b-awq')).toBe('qwen3');
+    });
+
+    test('should extract base name for glm models', () => {
+      expect(getBaseModelName('z-ai/glm-4.5-air:free')).toBe('glm');
+      expect(getBaseModelName('zhipu/glm-4.5-air')).toBe('glm');
+    });
+
+    test('should handle models without provider prefix', () => {
+      expect(getBaseModelName('glm-4.5-air:free')).toBe('glm');
+      expect(getBaseModelName('qwen3-coder')).toBe('qwen3');
     });
   });
 
@@ -246,9 +300,32 @@ describe('Kilo Code Model Selector - Helper Functions', () => {
 
       const result = fetchFreeModelsFromOpenRouter(apiModels);
       
+      // test/model-a and test/model-b both map to baseName 'model', so only 1 is returned (highest popularity)
+      expect(Object.keys(result)).toHaveLength(1);
+    });
+
+    test('should deduplicate model variants (same base model)', () => {
+      const apiModels = [
+        { id: 'qwen/qwen3-coder:free', name: 'Qwen3 Coder Free', description: 'Variant 1', pricing: { prompt: '0', completion: '0' }, credits: 100 },
+        { id: 'qwen/qwen3-coder-32b', name: 'Qwen3 Coder 32B', description: 'Variant 2', pricing: { prompt: '0', completion: '0' }, credits: 200 },
+        { id: 'qwen/qwen3-coder-32b-awq', name: 'Qwen3 Coder 32B AWQ', description: 'Variant 3', pricing: { prompt: '0', completion: '0' }, credits: 150 },
+        { id: 'z-ai/glm-4.5-air:free', name: 'GLM 4.5 Air Free', description: 'GLM Variant 1', pricing: { prompt: '0', completion: '0' }, credits: 300 },
+        { id: 'zhipu/glm-4.5-air', name: 'GLM 4.5 Air', description: 'GLM Variant 2', pricing: { prompt: '0', completion: '0' }, credits: 250 }
+      ];
+
+      const result = fetchFreeModelsFromOpenRouter(apiModels);
+      
+      // qwen variants all map to baseName 'qwen3' → 1 entry with highest popularity (Variant 2, credits=200)
+      // glm variants map to baseName 'glm' → 1 entry with highest popularity (GLM Variant 1, credits=300)
       expect(Object.keys(result)).toHaveLength(2);
-      expect(result['test_model_a'].description).toBe('First');
-      expect(result['test_model_b'].description).toBe('Third');
+      
+      // Find the qwen entry (key contains 'qwen3')
+      const qwenKey = Object.keys(result).find(k => k.includes('qwen3'));
+      expect(result[qwenKey].description).toBe('Variant 2');
+      
+      // Find the glm entry (key contains 'glm')
+      const glmKey = Object.keys(result).find(k => k.includes('glm'));
+      expect(result[glmKey].description).toBe('GLM Variant 1');
     });
   });
 
