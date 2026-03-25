@@ -69,10 +69,17 @@ describe('Kilo Code Model Selector - Helper Functions', () => {
       const models = apiModels || [];
       const freeModels = models.filter(isFreeModel);
       
+      const seen = new Map();
+      const uniqueFreeModels = freeModels.filter(model => {
+        if (seen.has(model.id)) return false;
+        seen.set(model.id, model);
+        return true;
+      });
+      
       const result = {};
       const existingKeys = new Set(Object.keys(MODELS));
       
-      for (const model of freeModels) {
+      for (const model of uniqueFreeModels) {
         const baseKey = generateModelKey(model.id);
         let key = baseKey;
         let counter = 1;
@@ -228,6 +235,20 @@ describe('Kilo Code Model Selector - Helper Functions', () => {
       const result = fetchFreeModelsFromOpenRouter(apiModels);
       
       expect(result['test_model'].description).toBe('Free model from OpenRouter');
+    });
+
+    test('should deduplicate models with same id', () => {
+      const apiModels = [
+        { id: 'test/model-a', name: 'Test Model A', description: 'First', pricing: { prompt: '0', completion: '0' } },
+        { id: 'test/model-a', name: 'Test Model A', description: 'Second', pricing: { prompt: '0', completion: '0' } },
+        { id: 'test/model-b', name: 'Test Model B', description: 'Third', pricing: { prompt: '0', completion: '0' } }
+      ];
+
+      const result = fetchFreeModelsFromOpenRouter(apiModels);
+      
+      expect(Object.keys(result)).toHaveLength(2);
+      expect(result['test_model_a'].description).toBe('First');
+      expect(result['test_model_b'].description).toBe('Third');
     });
   });
 

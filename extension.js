@@ -2,6 +2,7 @@ const vscode = require('vscode');
 const https = require('https');
 
 let DYNAMIC_MODELS = {};
+let DEPRECATED_MODELS = {};
 
 let MODELS = {
   'qwen-coder-32b': {
@@ -65,6 +66,19 @@ function getAllModels() {
   return { ...MODELS, ...DYNAMIC_MODELS };
 }
 
+function getAllModelsWithDeprecated() {
+  return { ...MODELS, ...DYNAMIC_MODELS, ...DEPRECATED_MODELS };
+}
+
+function getOpenRouterApiUrl() {
+  try {
+    const config = vscode.workspace.getConfiguration();
+    return config.get('kilo-code.openRouterApiUrl') || 'https://openrouter.ai/api/v1';
+  } catch {
+    return 'https://openrouter.ai/api/v1';
+  }
+}
+
 function httpGet(url) {
   return new Promise((resolve, reject) => {
     const req = https.get(url, {
@@ -73,6 +87,27 @@ function httpGet(url) {
       let data = '';
       res.on('data', chunk => data += chunk);
       res.on('end', () => {
+        if (res.statusCode >= 400) {
+          let errorMsg = `HTTP ${res.statusCode}`;
+          try {
+            const errorData = JSON.parse(data);
+            errorMsg += `: ${errorData.error?.message || errorData.message || data}`;
+          } catch {
+            errorMsg += `: ${data}`;
+          }
+          
+          if (res.statusCode === 429) {
+            reject(new Error(`${errorMsg}. Vui lòng đợi một chút và thử lại.`));
+          } else if (res.statusCode >= 500) {
+            reject(new Error(`${errorMsg}. OpenRouter đang gặp sự cố, vui lòng thử lại sau.`));
+          } else if (res.statusCode === 401) {
+            reject(new Error('API key không hợp lệ. Vui lòng kiểm tra cấu hình API key.'));
+          } else {
+            reject(new Error(errorMsg));
+          }
+          return;
+        }
+        
         try {
           resolve(JSON.parse(data));
         } catch (e) {
@@ -80,10 +115,18 @@ function httpGet(url) {
         }
       });
     });
-    req.on('error', reject);
+    req.on('error', (err) => {
+      if (err.code === 'ECONNREFUSED') {
+        reject(new Error('Không thể kết nối đến OpenRouter. Vui lòng kiểm tra kết nối internet.'));
+      } else if (err.code === 'ENOTFOUND') {
+        reject(new Error('Không tìm thấy server OpenRouter. Vui lòng kiểm tra DNS.'));
+      } else {
+        reject(err);
+      }
+    });
     req.setTimeout(30000, () => {
       req.destroy();
-      reject(new Error('Request timeout'));
+      reject(new Error('Request timeout. Vui lòng thử lại.'));
     });
   });
 }
@@ -101,7 +144,8 @@ function generateModelKey(id) {
 }
 
 async function fetchAllModelsFromOpenRouter() {
-  const data = await httpGet('https://openrouter.ai/api/v1/models?limit=300');
+  const apiUrl = getOpenRouterApiUrl();
+  const data = await httpGet(`${apiUrl}/models?limit=300`);
   return data.data || [];
 }
 
@@ -116,6 +160,14 @@ function findModelMapping(oldModelId, apiModels) {
     'starcoder': ['starcoder', 'bigcode']
   };
 
+  const isModelAvailable = (model) => {
+    if (model.deprecated === true) return false;
+    if (model.hidden === true) return false;
+    const status = model.status?.toLowerCase();
+    if (status === 'deprecated' || status === 'hidden' || status === 'unavailable') return false;
+    return true;
+  };
+
   for (const [category, keywords] of Object.entries(modelPatterns)) {
     if (oldModelId.toLowerCase().includes(category)) {
       const matches = apiModels.filter(m => 
@@ -123,11 +175,14 @@ function findModelMapping(oldModelId, apiModels) {
       );
       
       if (matches.length > 0) {
-        const freeMatch = matches.find(m => isFreeModel(m));
+        const activeMatches = matches.filter(m => isModelAvailable(m));
+        const candidateMatches = activeMatches.length > 0 ? activeMatches : matches;
+        
+        const freeMatch = candidateMatches.find(m => isFreeModel(m));
         if (freeMatch) {
           return freeMatch;
         }
-        return matches[0];
+        return candidateMatches[0];
       }
     }
   }
@@ -138,15 +193,26 @@ function fetchFreeModelsFromOpenRouter(apiModels) {
   const models = apiModels || [];
   const freeModels = models.filter(isFreeModel);
   
-  const result = {};
-  const existingKeys = new Set(Object.keys(MODELS));
+  const seen = new Map();
+  const uniqueFreeModels = freeModels.filter(model => {
+    if (seen.has(model.id)) return false;
+    seen.set(model.id, model);
+    return true;
+  });
   
-  for (const model of freeModels) {
+  const result = {};
+  const existingKeys = new Set([
+    ...Object.keys(MODELS),
+    ...Object.keys(DYNAMIC_MODELS),
+    ...Object.keys(DEPRECATED_MODELS)
+  ]);
+  
+  for (const model of uniqueFreeModels) {
     const baseKey = generateModelKey(model.id);
     let key = baseKey;
     let counter = 1;
     
-    while (existingKeys.has(key) || key in DYNAMIC_MODELS) {
+    while (key in result || existingKeys.has(key)) {
       key = `${baseKey}_${counter}`;
       counter++;
     }
@@ -181,7 +247,7 @@ function activate(context) {
           
           vscode.window.showInformationMessage(
             `Model hiện tại: ${modelLabel}`,
-            { modal: true, detail: `Model: ${modelName}\nAPI URL: ${currentMode.apiBaseUrl || 'https://openrouter.ai/api/v1'}` }
+            { modal: true, detail: `Model: ${modelName}\nAPI URL: ${currentMode.apiBaseUrl || getOpenRouterApiUrl()}` }
           );
         } else {
           vscode.window.showInformationMessage(
@@ -210,6 +276,28 @@ function activate(context) {
         let updatedCount = 0;
         let mappedCount = 0;
         let removedCount = 0;
+        let restoredCount = 0;
+        
+        // Kiểm tra và khôi phục các model deprecated nếu chúng xuất hiện lại trong API
+        for (const [depKey, depModel] of Object.entries(DEPRECATED_MODELS)) {
+          const isAvailable = (m) => {
+            if (m.deprecated === true) return false;
+            if (m.hidden === true) return false;
+            const status = m.status?.toLowerCase();
+            if (status === 'deprecated' || status === 'hidden' || status === 'unavailable') return false;
+            return true;
+          };
+          const canRestore = apiModels.some(m => m.id === depModel.model && isAvailable(m));
+          if (canRestore) {
+            MODELS[depKey] = {
+              ...depModel,
+              deprecated: false,
+              label: depModel.label.replace('[Deprecated] ', '')
+            };
+            delete DEPRECATED_MODELS[depKey];
+            restoredCount++;
+          }
+        }
         
         for (const [key, oldModel] of Object.entries(MODELS)) {
           const mappedModel = findModelMapping(oldModel.model, apiModels);
@@ -228,17 +316,26 @@ function activate(context) {
               mappedCount++;
             }
           } else {
-            delete MODELS[key];
-            removedCount++;
+            if (!oldModel.deprecated) {
+              DEPRECATED_MODELS[key] = {
+                ...oldModel,
+                deprecated: true,
+                label: `[Deprecated] ${oldModel.label}`
+              };
+              delete MODELS[key];
+              removedCount++;
+            }
           }
         }
         
         for (const [key, value] of Object.entries(freeModelsFromApi)) {
-          if (DYNAMIC_MODELS[key]) {
+          if (key in DYNAMIC_MODELS) {
             if (DYNAMIC_MODELS[key].description !== value.description) {
               DYNAMIC_MODELS[key] = { ...DYNAMIC_MODELS[key], ...value };
               updatedCount++;
             }
+          } else if (key in MODELS) {
+            // Bỏ qua nếu key đã tồn tại trong MODELS (static models ưu tiên hơn)
           } else {
             DYNAMIC_MODELS[key] = value;
             addedCount++;
@@ -247,7 +344,7 @@ function activate(context) {
         
         const allModels = getAllModels();
         vscode.window.showInformationMessage(
-          `Đã cập nhật! Tổng: ${Object.keys(allModels).length} models\n(${addedCount} mới, ${updatedCount} cập nhật, ${mappedCount} map sang model mới, ${removedCount} đã xóa).`
+          `Đã cập nhật! Tổng: ${Object.keys(allModels).length} models\n(${addedCount} mới, ${updatedCount} cập nhật, ${mappedCount} map sang model mới, ${removedCount} đã xóa, ${restoredCount} đã khôi phục).`
         );
       } catch (error) {
         console.error('Error in getFreeModels:', error);
@@ -295,7 +392,7 @@ function activate(context) {
           currentSelectorConfig.current_mode = {
             model: selected.key,
             apiKey: apiKey,
-            apiBaseUrl: 'https://openrouter.ai/api/v1'
+            apiBaseUrl: getOpenRouterApiUrl()
           };
           
           // Ghi lại toàn bộ object kilo-code.vsCodeLmModelSelector
