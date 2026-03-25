@@ -171,42 +171,81 @@ After selection, a message "Đã chọn model: [Model name]" will appear.
 
 ## Khắc phục sự cố
 
+## Troubleshooting
+
 ### Lỗi: "Extension không hoạt động"
 
+### Error: "Extension not working"
+
 **Giải pháp:**
+**Solution:**
 1. Đảm bảo đã cài đặt Kilo Code extension trước
 2. Reload VS Code bằng cách nhấn `Ctrl+Shift+P` và gõ "Developer: Reload Window"
 3. Thử cài đặt lại extension
 
+1. Make sure Kilo Code extension is installed first
+2. Reload VS Code by pressing `Ctrl+Shift+P` and typing "Developer: Reload Window"
+3. Try reinstalling the extension
+
 ### Lỗi: "API Key không hợp lệ"
 
+### Error: "Invalid API Key"
+
 **Giải pháp:**
+**Solution:**
 1. Kiểm tra lại API Key trong settings.json
 2. Đảm bảo key bắt đầu bằng "sk-or-v1-"
 3. Truy cập https://openrouter.ai/keys để tạo key mới nếu cần
 
+1. Check the API Key in settings.json
+2. Make sure the key starts with "sk-or-v1-"
+3. Visit https://openrouter.ai/keys to create a new key if needed
+
 ### Lỗi: "Không thể kết nối API"
 
+### Error: "Cannot connect to API"
+
 **Giải pháp:**
+**Solution:**
 1. Kiểm tra kết nối internet
 2. Kiểm tra xem API Key còn hiệu lực không
 3. Thử sử dụng model khác để xác định vấn đề
 
+1. Check internet connection
+2. Check if API Key is still valid
+3. Try using a different model to identify the issue
+
 ### Lỗi: "Credit không đủ"
 
+### Error: "Insufficient credit"
+
 **Giải pháp:**
+**Solution:**
 1. Truy cập https://openrouter.ai/settings
 2. Kiểm tra số dư tài khoản
 3. Nạp thêm credit nếu cần
 
+1. Visit https://openrouter.ai/settings
+2. Check account balance
+3. Add more credit if needed
+
 ## Yêu cầu hệ thống
+
+## System Requirements
 
 - VS Code 1.70.0 trở lên
 - Kilo Code extension đã được cài đặt
 - Tài khoản OpenRouter với API Key
 - Kết nối internet để sử dụng AI models
 
+- VS Code 1.70.0 or higher
+- Kilo Code extension installed
+- OpenRouter account with API Key
+- Internet connection to use AI models
+
 ## Cấu trúc project
+
+## Project Structure
 
 ```
 kilo-code-model-selector/
