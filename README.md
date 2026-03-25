@@ -1,14 +1,22 @@
 # Kilo Code Model Selector
 
-Extension VS Code để chọn model AI cho Kilo Code thông qua Ctrl+Shift+P.
+VS Code extension to select AI models for Kilo Code via Ctrl+Shift+P.
 
 ## Tổng quan
 
 Kilo Code Model Selector giúp bạn dễ dàng chuyển đổi giữa các AI models khác nhau để hỗ trợ lập trình. Extension tích hợp với Kilo Code và lưu cấu hình model đã chọn vào VS Code settings.
 
+## Overview
+
+Kilo Code Model Selector helps you easily switch between different AI models for coding assistance. The extension integrates with Kilo Code and saves your selected model configuration to VS Code settings.
+
 ## Yêu cầu trước khi cài đặt
 
+## Installation Requirements
+
 ### 1. Cài đặt Kilo Code Extension
+
+### 1. Install Kilo Code Extension
 
 Trước tiên, bạn cần cài đặt Kilo Code extension từ VS Code Marketplace:
 
@@ -19,7 +27,11 @@ Trước tiên, bạn cần cài đặt Kilo Code extension từ VS Code Marketp
 
 ### 2. Đăng ký tài khoản OpenRouter (Bắt buộc)
 
+### 2. Register OpenRouter Account (Required)
+
 Extension này sử dụng OpenRouter làm API gateway để kết nối với các AI models. Bạn cần đăng ký tài khoản và lấy API key:
+
+This extension uses OpenRouter as the API gateway to connect to AI models. You need to register an account and get an API key:
 
 **Bước 1: Truy cập OpenRouter**
 - Mở trình duyệt và truy cập: https://openrouter.ai/
@@ -50,7 +62,11 @@ Extension này sử dụng OpenRouter làm API gateway để kết nối với c
 
 ### 3. Cấu hình API Key trong Kilo Code
 
+### 3. Configure API Key in Kilo Code
+
 Sau khi có API Key từ OpenRouter, bạn cần cấu hình trong Kilo Code:
+
+After getting the API Key from OpenRouter, configure it in Kilo Code:
 
 1. Mở VS Code
 2. Nhấn `Ctrl+Shift+P` và gõ "Preferences: Open Settings (JSON)"
@@ -72,15 +88,21 @@ Sau khi có API Key từ OpenRouter, bạn cần cấu hình trong Kilo Code:
 
 ## Cài đặt Extension
 
+## Installation
+
 ### Cách 1: Cài đặt từ VSIX (Khuyến nghị cho người dùng)
 
-1. Tải file [`kilo-code-model-selector-1.0.0.vsix`](kilo-code-model-selector-1.0.0.vsix)
+### Method 1: Install from VSIX (Recommended for users)
+
+1. Tải file [`kilo-code-model-selector-1.1.0.vsix`](kilo-code-model-selector-1.1.0.vsix)
 2. Mở VS Code
 3. Nhấn `Ctrl+Shift+P` và gõ "Extensions: Install from VSIX"
 4. Chọn file vừa tải về
 5. Nhấn "Install" và sau đó "Reload Now"
 
 ### Cách 2: Cài đặt từ source (Dành cho nhà phát triển)
+
+### Method 2: Install from source (For developers)
 
 1. Clone repository:
 ```bash
@@ -97,22 +119,41 @@ code .
 
 ## Cách sử dụng
 
+## Usage
+
 ### Bước 1: Mở Command Palette
+
+### Step 1: Open Command Palette
 
 Nhấn `Ctrl+Shift+P` (Windows/Linux) hoặc `Cmd+Shift+P` (Mac)
 
+Press `Ctrl+Shift+P` (Windows/Linux) or `Cmd+Shift+P` (Mac)
+
 ### Bước 2: Chọn Model
+
+### Step 2: Select Model
 
 1. Gõ "Kilo Code: Select Model"
 2. Nhấn Enter để chọn command
 3. Một danh sách các models sẽ hiện ra
 4. Chọn model mong muốn bằng cách nhấn Enter hoặc click
 
+1. Type "Kilo Code: Select Model"
+2. Press Enter to select command
+3. A list of models will appear
+4. Select your desired model by pressing Enter or clicking
+
 ### Bước 3: Xác nhận
+
+### Step 3: Confirm
 
 Sau khi chọn, thông báo "Đã chọn model: [Tên model]" sẽ hiện lên.
 
+After selection, a message "Đã chọn model: [Model name]" will appear.
+
 ## Danh sách Models hiện có
+
+## Available Models
 
 | # | Tên hiển thị | Model ID | Mô tả |
 |---|-------------|----------|-------|
@@ -172,12 +213,12 @@ kilo-code-model-selector/
 ├── extension.js                     # Main code của extension
 ├── package.json                     # Extension manifest
 ├── README.md                        # Tài liệu hướng dẫn
-└── kilo-code-model-selector-1.0.0.vsix  # Package để cài đặt
+└── kilo-code-model-selector-1.1.0.vsix  # Package để cài đặt
 ```
 
 ## Thông tin thêm
 
-- **Version**: 1.0.0
+- **Version**: 1.1.0
 - **Author**: Custom
 - **License**: MIT
 - **Repository**: https://github.com/lyhuynh323/kilo-code-model-selector

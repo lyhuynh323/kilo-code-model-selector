@@ -2,9 +2,16 @@
   "name": "kilo-code-model-selector",
   "displayName": "Kilo Code Model Selector",
   "description": "Extension để chọn model cho Kilo Code",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "repository": "https://github.com/example/kilo-code-model-selector",
   "publisher": "custom",
+  "scripts": {
+    "test": "jest --coverage",
+    "test:watch": "jest --watch"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0"
+  },
   "engines": {
     "vscode": "^1.70.0"
   },
@@ -13,6 +20,10 @@
   ],
   "contributes": {
     "commands": [
+      {
+        "command": "kilo-code-model-selector.getFreeModels",
+        "title": "Kilo Code: Get Free Models"
+      },
       {
         "command": "kilo-code-model-selector.selectModel",
         "title": "Kilo Code: Select Model"

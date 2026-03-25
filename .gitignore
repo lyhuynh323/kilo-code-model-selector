@@ -1,0 +1,14 @@
+node_modules/
+*.log
+.DS_Store
+.vscode-test/
+*.vsix
+out/
+dist/
+coverage/
+.env
+.env.local
+*.tgz
+*.swp
+*.swo
+*~

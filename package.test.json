@@ -1,0 +1,13 @@
+{
+  "name": "kilo-code-model-selector",
+  "version": "1.0.0",
+  "description": "Unit tests for Kilo Code Model Selector",
+  "main": "extension.js",
+  "scripts": {
+    "test": "jest --coverage",
+    "test:watch": "jest --watch"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0"
+  }
+}
